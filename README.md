@@ -98,6 +98,12 @@ Everything runs **100% locally** in your browser. No data is sent anywhere. No s
 
 ---
 
+## Author
+
+Created by **[Oz Levi](https://www.linkedin.com/in/ozlevi1/)**
+
+---
+
 ## License
 
 MIT
