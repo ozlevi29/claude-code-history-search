@@ -211,9 +211,20 @@
       letter-spacing: 0.06em;
       margin-bottom: 0.3rem;
       color: var(--muted);
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
     }
     .message.user .message-role { color: var(--accent); }
     .message.assistant .message-role { color: var(--accent2); }
+    .message-time {
+      font-size: 0.68rem;
+      font-weight: 400;
+      color: var(--muted);
+      letter-spacing: 0;
+      text-transform: none;
+      opacity: 0.7;
+    }
 
     .message-bubble {
       background: var(--card);
@@ -710,13 +721,13 @@ function parseSession(rawText, sessId, projName, lastModified) {
       const txt = extractText(r.message.content);
       if (txt) {
         if (!title) title = txt.slice(0, 100);
-        messages.push({ role: 'user', text: txt });
+        messages.push({ role: 'user', text: txt, timestamp: r.timestamp || null });
       }
     }
 
     if (r.type === 'assistant' && r.message?.role === 'assistant') {
       const txt = extractText(r.message.content);
-      if (txt) messages.push({ role: 'assistant', text: txt });
+      if (txt) messages.push({ role: 'assistant', text: txt, timestamp: r.timestamp || null });
     }
   }
 
@@ -843,15 +854,25 @@ function openSession(sessId) {
   }
 }
 
+function formatMsgTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (isNaN(d)) return '';
+  const isHe = document.getElementById('htmlRoot')?.lang === 'he';
+  const locale = isHe ? 'he-IL' : 'en-US';
+  return d.toLocaleString(locale, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 function renderMessages(s) {
   const container = document.getElementById('messagesContainer');
   container.innerHTML = s.messages.map(msg => {
     const label = msg.role === 'user' ? t('userLabel') : t('assistantLabel');
+    const timeStr = formatMsgTime(msg.timestamp);
     let body = esc(msg.text);
     if (currentQuery) body = hl(body, currentQuery);
     if (convQuery) body = hlConv(body, convQuery);
     return `<div class="message ${msg.role}">
-      <div class="message-role">${label}</div>
+      <div class="message-role">${label}${timeStr ? `<span class="message-time">${timeStr}</span>` : ''}</div>
       <div class="message-bubble">${body}</div>
     </div>`;
   }).join('');
