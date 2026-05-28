@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html id="htmlRoot" lang="he" dir="rtl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -41,7 +41,7 @@
       flex-shrink: 0;
     }
     .header h1 { font-size: 0.95rem; font-weight: 600; }
-    .header .stats { color: var(--muted); font-size: 0.8rem; margin-right: auto; }
+    .header .stats { color: var(--muted); font-size: 0.8rem; margin-inline-start: auto; }
     .btn {
       background: var(--card);
       border: 1px solid var(--border);
@@ -64,7 +64,7 @@
     .sidebar {
       width: 320px;
       flex-shrink: 0;
-      border-left: 1px solid var(--border);
+      border-inline-end: 1px solid var(--border);
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -334,10 +334,11 @@
 <div class="toast" id="toast"></div>
 
 <div class="header">
-  <h1>🔍 Claude Code — חיפוש שיחות</h1>
+  <h1 id="appTitle">🔍 Claude Code — חיפוש שיחות</h1>
   <span class="stats" id="statsText"></span>
   <button class="btn primary" id="folderBtn" onclick="openFolder()">📁 פתח תיקיית שיחות</button>
   <button class="btn" id="changeBtn" onclick="changeFolderPicker()" style="display:none" title="בחר תיקייה אחרת">📁 שנה</button>
+  <button class="btn" id="langBtn" onclick="toggleLang()">EN</button>
 </div>
 
 <div class="main">
@@ -362,9 +363,9 @@
       </div>
     </div>
     <div class="results-list" id="resultsList">
-      <div class="empty-state">
+      <div class="empty-state" id="initialEmptyState">
         <div style="font-size:2rem;margin-bottom:0.5rem">📂</div>
-        לחץ "פתח תיקיית שיחות"<br>ובחר את תיקיית <strong>.claude\projects</strong>
+        <span id="initialEmptyMain">לחץ "פתח תיקיית שיחות"<br>ובחר את תיקיית <strong>.claude\projects</strong></span>
         <div style="margin-top:0.75rem;font-size:0.75rem;opacity:0.7">
           C:\Users\..\.claude\projects
         </div>
@@ -375,14 +376,14 @@
   <div class="viewer">
     <div class="welcome" id="welcomePanel">
       <div class="welcome-icon">💬</div>
-      <h2>בחר שיחה מהרשימה</h2>
-      <p>חפש בכל תוכן השיחות שלך — הודעות, קוד, פתרונות.</p>
+      <h2 id="welcomeTitle">בחר שיחה מהרשימה</h2>
+      <p id="welcomeDesc">חפש בכל תוכן השיחות שלך — הודעות, קוד, פתרונות.</p>
     </div>
     <div class="viewer-content" id="viewerContent">
       <div class="viewer-header">
         <div class="viewer-title" id="viewerTitle"></div>
         <div class="viewer-meta" id="viewerMeta"></div>
-        <button class="btn" onclick="openConvSearch()" title="Ctrl+F">🔍 חפש בשיחה</button>
+        <button class="btn" id="convSearchBtn" onclick="openConvSearch()" title="Ctrl+F">🔍 חפש בשיחה</button>
         <button class="btn" id="resumeBtn" onclick="copyResume()">📋 העתק פקודת resume</button>
       </div>
       <div class="conv-search-bar" id="convSearchBar" style="display:none">
@@ -407,7 +408,145 @@ let convQuery = '';
 let convMatches = [];
 let convMatchIdx = 0;
 
-// ===== IndexedDB persistence for directory handle =====
+// ===== i18n =====
+
+const i18n = {
+  he: {
+    htmlLang: 'he', dir: 'rtl', locale: 'he-IL',
+    title: 'Claude Code – חיפוש שיחות',
+    appTitle: '🔍 Claude Code — חיפוש שיחות',
+    langBtn: 'EN',
+    folderBtnInit: '📁 פתח תיקיית שיחות',
+    folderBtnSaved: '🔄 טען שיחות',
+    folderBtnLoaded: '🔄 רענן',
+    changeBtn: '📁 שנה',
+    changeBtnTitle: 'בחר תיקייה אחרת',
+    searchPlaceholder: 'חיפוש בכל השיחות...',
+    allProjects: 'כל הפרויקטים',
+    sortDate: 'לפי תאריך',
+    sortRelevance: 'לפי רלוונטיות',
+    welcomeTitle: 'בחר שיחה מהרשימה',
+    welcomeDesc: 'חפש בכל תוכן השיחות שלך — הודעות, קוד, פתרונות.',
+    convSearchBtn: '🔍 חפש בשיחה',
+    resumeBtn: '📋 העתק פקודת resume',
+    convSearchPlaceholder: 'חיפוש בשיחה זו...',
+    initialEmptyMain: 'לחץ "פתח תיקיית שיחות"<br>ובחר את תיקיית <strong>.claude\\projects</strong>',
+    loadingScanning: 'סורק תיקיות...',
+    loadingLoading: 'טוען שיחות...',
+    statsText: n => `${n} שיחות`,
+    noResults: q => `לא נמצאו תוצאות עבור "<strong>${q}</strong>"`,
+    noConversations: 'אין שיחות להצגה',
+    userLabel: '👤 אתה',
+    assistantLabel: '🤖 Claude',
+    zeroResults: '0 תוצאות',
+    toastCopied: '✅ הועתק! הדבק בטרמינל',
+    copyManually: 'העתק ידנית:',
+    noTitle: 'שיחה ללא כותרת',
+    today: 'היום',
+    yesterday: 'אתמול',
+    daysAgo: n => `לפני ${n} ימים`,
+    browserError: 'הדפדפן שלך לא תומך ב-File System Access API.\nאנא השתמש ב-Chrome או Edge.',
+    loadError: 'שגיאה בטעינה:\n',
+  },
+  en: {
+    htmlLang: 'en', dir: 'ltr', locale: 'en-US',
+    title: 'Claude Code – Conversation Search',
+    appTitle: '🔍 Claude Code — Conversation Search',
+    langBtn: 'עב',
+    folderBtnInit: '📁 Open Conversations Folder',
+    folderBtnSaved: '🔄 Load Conversations',
+    folderBtnLoaded: '🔄 Refresh',
+    changeBtn: '📁 Change',
+    changeBtnTitle: 'Select a different folder',
+    searchPlaceholder: 'Search all conversations...',
+    allProjects: 'All Projects',
+    sortDate: 'By Date',
+    sortRelevance: 'By Relevance',
+    welcomeTitle: 'Select a conversation',
+    welcomeDesc: 'Search all your conversation content — messages, code, solutions.',
+    convSearchBtn: '🔍 Search in conversation',
+    resumeBtn: '📋 Copy resume command',
+    convSearchPlaceholder: 'Search in this conversation...',
+    initialEmptyMain: 'Click "Open Conversations Folder"<br>and select the <strong>.claude\\projects</strong> folder',
+    loadingScanning: 'Scanning folders...',
+    loadingLoading: 'Loading conversations...',
+    statsText: n => `${n} conversation${n !== 1 ? 's' : ''}`,
+    noResults: q => `No results for "<strong>${q}</strong>"`,
+    noConversations: 'No conversations to show',
+    userLabel: '👤 You',
+    assistantLabel: '🤖 Claude',
+    zeroResults: '0 results',
+    toastCopied: '✅ Copied! Paste in terminal',
+    copyManually: 'Copy manually:',
+    noTitle: 'Untitled conversation',
+    today: 'Today',
+    yesterday: 'Yesterday',
+    daysAgo: n => `${n} days ago`,
+    browserError: 'Your browser does not support the File System Access API.\nPlease use Chrome or Edge.',
+    loadError: 'Error loading:\n',
+  },
+};
+
+let lang = 'he';
+
+function t(key, ...args) {
+  const val = i18n[lang][key];
+  return typeof val === 'function' ? val(...args) : val;
+}
+
+function applyLang() {
+  const html = document.getElementById('htmlRoot');
+  html.lang = t('htmlLang');
+  html.dir = t('dir');
+  document.title = t('title');
+  document.getElementById('appTitle').textContent = t('appTitle');
+  document.getElementById('langBtn').textContent = t('langBtn');
+  document.getElementById('changeBtn').textContent = t('changeBtn');
+  document.getElementById('changeBtn').title = t('changeBtnTitle');
+  document.getElementById('searchInput').placeholder = t('searchPlaceholder');
+  document.getElementById('welcomeTitle').textContent = t('welcomeTitle');
+  document.getElementById('welcomeDesc').textContent = t('welcomeDesc');
+  document.getElementById('convSearchBtn').textContent = t('convSearchBtn');
+  document.getElementById('resumeBtn').textContent = t('resumeBtn');
+  document.getElementById('convSearchInput').placeholder = t('convSearchPlaceholder');
+
+  const initialMain = document.getElementById('initialEmptyMain');
+  if (initialMain) initialMain.innerHTML = t('initialEmptyMain');
+
+  const sort = document.getElementById('sortSelect');
+  const sortVal = sort.value;
+  sort.innerHTML = `<option value="date">${t('sortDate')}</option><option value="relevance">${t('sortRelevance')}</option>`;
+  sort.value = sortVal;
+
+  if (sessions.length > 0) {
+    setFolderBtnState('loaded');
+    document.getElementById('statsText').textContent = t('statsText', sessions.length);
+    const projVal = document.getElementById('projectFilter').value;
+    buildProjectFilter();
+    document.getElementById('projectFilter').value = projVal;
+    onSearch();
+  } else if (savedDirHandle) {
+    setFolderBtnState('saved');
+  } else {
+    setFolderBtnState('init');
+  }
+
+  if (activeSessionId) {
+    const s = sessions.find(x => x.id === activeSessionId);
+    if (s) {
+      document.getElementById('viewerMeta').textContent = fmtDate(s.date) + ' · ' + s.projectShort;
+      renderMessages(s);
+    }
+  }
+}
+
+async function toggleLang() {
+  lang = lang === 'he' ? 'en' : 'he';
+  await idbPut('lang', lang).catch(() => {});
+  applyLang();
+}
+
+// ===== IndexedDB persistence =====
 
 function openIDB() {
   return new Promise((res, rej) => {
@@ -444,13 +583,13 @@ function setFolderBtnState(state) {
   const btn = document.getElementById('folderBtn');
   const changeBtn = document.getElementById('changeBtn');
   if (state === 'saved') {
-    btn.textContent = '🔄 טען שיחות';
+    btn.textContent = t('folderBtnSaved');
     changeBtn.style.display = '';
   } else if (state === 'loaded') {
-    btn.textContent = '🔄 רענן';
+    btn.textContent = t('folderBtnLoaded');
     changeBtn.style.display = '';
   } else {
-    btn.textContent = '📁 פתח תיקיית שיחות';
+    btn.textContent = t('folderBtnInit');
     changeBtn.style.display = 'none';
   }
 }
@@ -486,7 +625,7 @@ async function openFolder() {
 
 async function changeFolderPicker() {
   if (!('showDirectoryPicker' in window)) {
-    alert('הדפדפן שלך לא תומך ב-File System Access API.\nאנא השתמש ב-Chrome או Edge.');
+    alert(t('browserError'));
     return;
   }
   try {
@@ -496,14 +635,19 @@ async function changeFolderPicker() {
     setFolderBtnState('loaded');
     await loadSessions(dir);
   } catch (e) {
-    if (e.name !== 'AbortError') alert('שגיאה בטעינה:\n' + e.message);
+    if (e.name !== 'AbortError') alert(t('loadError') + e.message);
   }
 }
 
-document.addEventListener('DOMContentLoaded', initSavedFolder);
+document.addEventListener('DOMContentLoaded', async () => {
+  const savedLang = await idbGet('lang').catch(() => null);
+  if (savedLang === 'en') lang = 'en';
+  if (lang === 'en') applyLang();
+  await initSavedFolder();
+});
 
 async function loadSessions(rootHandle) {
-  setLoading(true, 'סורק תיקיות...', '');
+  setLoading(true, t('loadingScanning'), '');
   sessions.length = 0;
 
   const allFiles = [];
@@ -518,7 +662,7 @@ async function loadSessions(rootHandle) {
     }
   }
 
-  setLoading(true, 'טוען שיחות...', `0 / ${allFiles.length}`);
+  setLoading(true, t('loadingLoading'), `0 / ${allFiles.length}`);
   let done = 0;
 
   for (const { projName, sessId, fileHandle } of allFiles) {
@@ -539,7 +683,7 @@ async function loadSessions(rootHandle) {
   buildProjectFilter();
   enableControls();
   setLoading(false);
-  document.getElementById('statsText').textContent = `${sessions.length} שיחות`;
+  document.getElementById('statsText').textContent = t('statsText', sessions.length);
   renderResults(sessions);
 }
 
@@ -585,7 +729,7 @@ function parseSession(rawText, sessId, projName, lastModified) {
     projectPath,
     projectShort: projectPath.split('\\').pop() || projName,
     date: date || new Date(lastModified),
-    title: title || 'שיחה ללא כותרת',
+    title: title || t('noTitle'),
     messages,
     searchText: (title + '\n' + messages.map(m => m.text).join('\n')).toLowerCase(),
   };
@@ -597,10 +741,8 @@ function extractText(content) {
   for (const block of content) {
     if (block.type === 'text' && block.text) {
       const cleaned = block.text
-        // Strip system/noisy tags AND their content
         .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
         .replace(/<user-prompt-submit-hook>[\s\S]*?<\/user-prompt-submit-hook>/g, '')
-        // For all other tags: remove tag markers but keep their content
         .replace(/<[^>]+>/g, ' ')
         .replace(/\s{3,}/g, '\n\n')
         .trim();
@@ -645,7 +787,7 @@ function countOccurrences(str, sub) {
 function renderResults(list) {
   const el = document.getElementById('resultsList');
   if (!list.length) {
-    el.innerHTML = `<div class="empty-state">${currentQuery ? `לא נמצאו תוצאות עבור "<strong>${esc(currentQuery)}</strong>"` : 'אין שיחות להצגה'}</div>`;
+    el.innerHTML = `<div class="empty-state">${currentQuery ? t('noResults', esc(currentQuery)) : t('noConversations')}</div>`;
     return;
   }
   el.innerHTML = list.map(s => {
@@ -704,7 +846,7 @@ function openSession(sessId) {
 function renderMessages(s) {
   const container = document.getElementById('messagesContainer');
   container.innerHTML = s.messages.map(msg => {
-    const label = msg.role === 'user' ? '👤 אתה' : '🤖 Claude';
+    const label = msg.role === 'user' ? t('userLabel') : t('assistantLabel');
     let body = esc(msg.text);
     if (currentQuery) body = hl(body, currentQuery);
     if (convQuery) body = hlConv(body, convQuery);
@@ -768,7 +910,7 @@ function activateConvMatch(idx) {
 function updateConvCount() {
   document.getElementById('convSearchCount').textContent = convMatches.length > 0
     ? `${convMatchIdx + 1} / ${convMatches.length}`
-    : (convQuery ? '0 תוצאות' : '');
+    : (convQuery ? t('zeroResults') : '');
 }
 
 document.addEventListener('keydown', e => {
@@ -784,9 +926,9 @@ function copyResume() {
   const id = document.getElementById('resumeBtn').dataset.id;
   if (!id) return;
   navigator.clipboard.writeText(`claude --resume ${id}`)
-    .then(() => showToast('✅ הועתק! הדבק בטרמינל'))
+    .then(() => showToast(t('toastCopied')))
     .catch(() => {
-      prompt('העתק ידנית:', `claude --resume ${id}`);
+      prompt(t('copyManually'), `claude --resume ${id}`);
     });
 }
 
@@ -795,7 +937,7 @@ function copyResume() {
 function buildProjectFilter() {
   const projects = [...new Set(sessions.map(s => s.projName))].sort();
   const sel = document.getElementById('projectFilter');
-  sel.innerHTML = '<option value="">כל הפרויקטים</option>' +
+  sel.innerHTML = `<option value="">${t('allProjects')}</option>` +
     projects.map(p => {
       const short = decodePath(p).split('\\').pop() || p;
       return `<option value="${esc(p)}">${esc(short)}</option>`;
@@ -815,10 +957,10 @@ function fmtDate(d) {
   if (!d) return '';
   const diff = Date.now() - d;
   const days = Math.floor(diff / 86400000);
-  if (days === 0) return 'היום';
-  if (days === 1) return 'אתמול';
-  if (days < 7) return `לפני ${days} ימים`;
-  return d.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' });
+  if (days === 0) return t('today');
+  if (days === 1) return t('yesterday');
+  if (days < 7) return t('daysAgo', days);
+  return d.toLocaleDateString(t('locale'), { day: 'numeric', month: 'short' });
 }
 
 function esc(s) {
