@@ -336,7 +336,8 @@
 <div class="header">
   <h1>🔍 Claude Code — חיפוש שיחות</h1>
   <span class="stats" id="statsText"></span>
-  <button class="btn primary" onclick="openFolder()">📁 פתח תיקיית שיחות</button>
+  <button class="btn primary" id="folderBtn" onclick="openFolder()">📁 פתח תיקיית שיחות</button>
+  <button class="btn" id="changeBtn" onclick="changeFolderPicker()" style="display:none" title="בחר תיקייה אחרת">📁 שנה</button>
 </div>
 
 <div class="main">
@@ -406,20 +407,100 @@ let convQuery = '';
 let convMatches = [];
 let convMatchIdx = 0;
 
+// ===== IndexedDB persistence for directory handle =====
+
+function openIDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open('claude-search', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('state');
+    req.onsuccess = e => res(e.target.result);
+    req.onerror = e => rej(e.target.error);
+  });
+}
+async function idbPut(key, value) {
+  const db = await openIDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('state', 'readwrite');
+    tx.objectStore('state').put(value, key);
+    tx.oncomplete = res;
+    tx.onerror = e => rej(e.target.error);
+  });
+}
+async function idbGet(key) {
+  const db = await openIDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('state', 'readonly');
+    const req = tx.objectStore('state').get(key);
+    req.onsuccess = e => res(e.target.result ?? null);
+    req.onerror = e => rej(e.target.error);
+  });
+}
+
 // ===== Folder loading =====
 
+let savedDirHandle = null;
+
+function setFolderBtnState(state) {
+  const btn = document.getElementById('folderBtn');
+  const changeBtn = document.getElementById('changeBtn');
+  if (state === 'saved') {
+    btn.textContent = '🔄 טען שיחות';
+    changeBtn.style.display = '';
+  } else if (state === 'loaded') {
+    btn.textContent = '🔄 רענן';
+    changeBtn.style.display = '';
+  } else {
+    btn.textContent = '📁 פתח תיקיית שיחות';
+    changeBtn.style.display = 'none';
+  }
+}
+
+async function initSavedFolder() {
+  try {
+    const handle = await idbGet('dirHandle');
+    if (!handle) return;
+    savedDirHandle = handle;
+    const perm = await handle.queryPermission({ mode: 'read' });
+    if (perm === 'granted') {
+      setFolderBtnState('loaded');
+      await loadSessions(handle);
+    } else {
+      setFolderBtnState('saved');
+    }
+  } catch { /* ignore */ }
+}
+
 async function openFolder() {
+  if (savedDirHandle) {
+    try {
+      const perm = await savedDirHandle.requestPermission({ mode: 'read' });
+      if (perm === 'granted') {
+        setFolderBtnState('loaded');
+        await loadSessions(savedDirHandle);
+        return;
+      }
+    } catch { /* fall through to picker */ }
+  }
+  await changeFolderPicker();
+}
+
+async function changeFolderPicker() {
   if (!('showDirectoryPicker' in window)) {
     alert('הדפדפן שלך לא תומך ב-File System Access API.\nאנא השתמש ב-Chrome או Edge.');
     return;
   }
   try {
     const dir = await window.showDirectoryPicker({ mode: 'read' });
+    savedDirHandle = dir;
+    await idbPut('dirHandle', dir).catch(() => {});
+    setFolderBtnState('loaded');
     await loadSessions(dir);
   } catch (e) {
     if (e.name !== 'AbortError') alert('שגיאה בטעינה:\n' + e.message);
   }
 }
+
+document.addEventListener('DOMContentLoaded', initSavedFolder);
 
 async function loadSessions(rootHandle) {
   setLoading(true, 'סורק תיקיות...', '');
