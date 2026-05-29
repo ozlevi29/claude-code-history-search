@@ -73,6 +73,11 @@ Navigate between matches with ↑ ↓ buttons or Enter / Shift+Enter.
 
 ![In-conversation search](screenshots/conv-search.png)
 
+### Images in conversations
+Images you sent during a conversation are displayed inline inside the message bubble — no external viewer needed.
+
+Click any image to open it in a **full-screen lightbox**. Click anywhere or press **Escape** to close.
+
 ### Resume a conversation
 Click **"📋 העתק פקודת resume"** to copy `claude --resume <session-id>` to your clipboard. Paste it in your terminal to continue the conversation in Claude Code.
 
