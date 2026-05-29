@@ -327,6 +327,26 @@
       outline: 1px solid var(--success);
     }
 
+    /* ===== Lightbox ===== */
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.88);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 300;
+      cursor: zoom-out;
+    }
+    .lightbox.hidden { display: none; }
+    .lightbox img {
+      max-width: 95vw;
+      max-height: 95vh;
+      object-fit: contain;
+      border-radius: 6px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    }
+
     /* ===== Toast ===== */
     .toast {
       position: fixed;
@@ -348,6 +368,10 @@
   </style>
 </head>
 <body>
+
+<div class="lightbox hidden" id="lightbox" onclick="closeLightbox()">
+  <img id="lightboxImg" src="" alt="">
+</div>
 
 <div class="loading-overlay hidden" id="loadingOverlay">
   <div class="spinner"></div>
@@ -811,7 +835,7 @@ function renderMsgContent(msg) {
   }
   return blocks.map(block => {
     if (block.type === 'image') {
-      return `<img class="msg-image" src="${block.src}" alt="" loading="lazy">`;
+      return `<img class="msg-image" src="${block.src}" alt="" loading="lazy" onclick="openLightbox(this)">`;
     }
     let text = esc(block.text || '');
     if (currentQuery) text = hl(text, currentQuery);
@@ -1067,6 +1091,22 @@ function showToast(msg) {
 }
 
 function tick() { return new Promise(r => setTimeout(r, 0)); }
+
+// ===== Lightbox =====
+
+function openLightbox(img) {
+  document.getElementById('lightboxImg').src = img.src;
+  document.getElementById('lightbox').classList.remove('hidden');
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.add('hidden');
+  document.getElementById('lightboxImg').src = '';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeLightbox();
+});
 </script>
 </body>
 </html>
