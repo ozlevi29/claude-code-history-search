@@ -233,9 +233,22 @@
       padding: 0.65rem 0.85rem;
       font-size: 0.86rem;
       line-height: 1.65;
-      white-space: pre-wrap;
       word-break: break-word;
       max-width: 92%;
+    }
+    .msg-text {
+      display: block;
+      white-space: pre-wrap;
+    }
+    .msg-text + .msg-image, .msg-image + .msg-text { margin-top: 0.5rem; }
+    .msg-image {
+      display: block;
+      max-width: 100%;
+      max-height: 420px;
+      border-radius: 6px;
+      margin: 4px 0;
+      cursor: zoom-in;
+      object-fit: contain;
     }
     .message.user .message-bubble { background: #1a2535; border-color: #2d3d52; }
     .message-bubble mark {
@@ -719,15 +732,17 @@ function parseSession(rawText, sessId, projName, lastModified) {
 
     if (r.type === 'user' && r.message?.role === 'user') {
       const txt = extractText(r.message.content);
-      if (txt) {
-        if (!title) title = txt.slice(0, 100);
-        messages.push({ role: 'user', text: txt, timestamp: r.timestamp || null });
+      const blocks = extractContent(r.message.content);
+      const hasImages = blocks.some(b => b.type === 'image');
+      if (txt || hasImages) {
+        if (!title && txt) title = txt.slice(0, 100);
+        messages.push({ role: 'user', text: txt, content: blocks, timestamp: r.timestamp || null });
       }
     }
 
     if (r.type === 'assistant' && r.message?.role === 'assistant') {
       const txt = extractText(r.message.content);
-      if (txt) messages.push({ role: 'assistant', text: txt, timestamp: r.timestamp || null });
+      if (txt) messages.push({ role: 'assistant', text: txt, content: extractContent(r.message.content), timestamp: r.timestamp || null });
     }
   }
 
@@ -761,6 +776,48 @@ function extractText(content) {
     }
   }
   return parts.join('\n').trim();
+}
+
+function extractContent(content) {
+  if (!Array.isArray(content)) return [];
+  const blocks = [];
+  for (const block of content) {
+    if (block.type === 'text' && block.text) {
+      const cleaned = block.text
+        .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
+        .replace(/<user-prompt-submit-hook>[\s\S]*?<\/user-prompt-submit-hook>/g, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s{3,}/g, '\n\n')
+        .trim();
+      if (cleaned) blocks.push({ type: 'text', text: cleaned });
+    } else if (block.type === 'image' && block.source) {
+      if (block.source.type === 'base64' && block.source.data) {
+        blocks.push({ type: 'image', src: `data:${block.source.media_type || 'image/png'};base64,${block.source.data}` });
+      } else if (block.source.type === 'url' && block.source.url) {
+        blocks.push({ type: 'image', src: block.source.url });
+      }
+    }
+  }
+  return blocks;
+}
+
+function renderMsgContent(msg) {
+  const blocks = msg.content;
+  if (!blocks || blocks.length === 0) {
+    let text = esc(msg.text || '');
+    if (currentQuery) text = hl(text, currentQuery);
+    if (convQuery) text = hlConv(text, convQuery);
+    return `<span class="msg-text">${text}</span>`;
+  }
+  return blocks.map(block => {
+    if (block.type === 'image') {
+      return `<img class="msg-image" src="${block.src}" alt="" loading="lazy">`;
+    }
+    let text = esc(block.text || '');
+    if (currentQuery) text = hl(text, currentQuery);
+    if (convQuery) text = hlConv(text, convQuery);
+    return `<span class="msg-text">${text}</span>`;
+  }).join('');
 }
 
 function decodePath(name) {
@@ -868,9 +925,7 @@ function renderMessages(s) {
   container.innerHTML = s.messages.map(msg => {
     const label = msg.role === 'user' ? t('userLabel') : t('assistantLabel');
     const timeStr = formatMsgTime(msg.timestamp);
-    let body = esc(msg.text);
-    if (currentQuery) body = hl(body, currentQuery);
-    if (convQuery) body = hlConv(body, convQuery);
+    const body = renderMsgContent(msg);
     return `<div class="message ${msg.role}">
       <div class="message-role">${label}${timeStr ? `<span class="message-time">${timeStr}</span>` : ''}</div>
       <div class="message-bubble">${body}</div>
