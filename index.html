@@ -750,7 +750,7 @@ function parseSession(rawText, sessId, projName, lastModified) {
     let r;
     try { r = JSON.parse(line); } catch { continue; }
 
-    if (!date && r.timestamp) date = new Date(r.timestamp);
+    if (r.timestamp) date = new Date(r.timestamp);
 
     if (!title && r.type === 'last-prompt' && r.lastPrompt) {
       title = r.lastPrompt.replace(/\s+/g, ' ').trim().slice(0, 100);
@@ -780,7 +780,7 @@ function parseSession(rawText, sessId, projName, lastModified) {
     projName,
     projectPath,
     projectShort: projectPath.split('\\').pop() || projName,
-    date: date || new Date(lastModified),
+    date: new Date(lastModified),
     title: title || t('noTitle'),
     messages,
     searchText: (title + '\n' + messages.map(m => m.text).join('\n')).toLowerCase(),
