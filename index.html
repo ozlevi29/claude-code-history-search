@@ -965,7 +965,7 @@ function renderMessages(s) {
       <div class="message-bubble">${body}</div>
     </div>`;
   }).join('');
-  container.scrollTop = 0;
+  container.scrollTop = container.scrollHeight;
 }
 
 // ===== In-conversation search =====
